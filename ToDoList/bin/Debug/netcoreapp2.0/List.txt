@@ -1,0 +1,2 @@
+praca,2018-02-12,2018-02-20,false,true
+zbawa,2018-03-23,,true,false
