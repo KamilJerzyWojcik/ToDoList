@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace ToDoList
 {
@@ -9,23 +10,36 @@ namespace ToDoList
 		static void Main(string[] args)
 		{
 			string command;
-			List<TaskModel> tasks = new List<TaskModel> {
-				new TaskModel("wycieczka", "2018-09-12", true, false),
-				new TaskModel("wyjazd służbowy", "2018-09-30", false, true, "2018-12-01")
-			};
+			List<TaskModel> tasks = FakeTasksList.GetFakeList();
 
+			Dictionary<string, int> menu = new Dictionary<string, int>
+			{
+				["Add task: "] = 15,
+				["add"] = 10,
+				["Remove task: "] = 15,
+				["remove"] = 10,
+				["Show task: "] = 15,
+				["show"] = 10,
+				["Save task: "] = 15,
+				["save"] = 10,
+				["Load task: "] = 15,
+				["load"] = 10,
+				["Filter task"] = 15,
+				["filter"] = 10,
+				["Exit program"] = 15,
+				["exit"] = 10
+			};
+			ConsoleWriter.ConsoleColor("Select command from list:", ConsoleColor.Cyan);
 			do
 			{
-				Console.WriteLine("AddTask: add\n" + "RemoveTask: remove\n" + "ShowTask: show\n" +
-								  "SaveTask: save\n" + "LoadTask: load\n\n");
-				Console.Write("Write command: ");
+
+
+				ConsoleWriter.WriteHead(menu, Position.Mix);
+				CurrentTask(tasks);
+				Console.Write("\nWrite command: ");
 				command = Console.ReadLine().Trim().ToLower();
 
-
-				if (command == "exit")
-				{
-					break;
-				}
+				if (command == "exit") break;
 
 				switch (command)
 				{
@@ -45,119 +59,125 @@ namespace ToDoList
 					case "load":
 						LoadTasks(tasks);
 						break;
-					default:
+					case "filter":
 						Console.Clear();
-						Console.ForegroundColor = ConsoleColor.Cyan;
-						Console.WriteLine("Select command from list:\n");
-						Console.ResetColor();
+						FilterBy.FilterMenu(tasks);
+						break;
+					default:
+						ConsoleWriter.ConsoleColor("Select command from list:", ConsoleColor.Cyan);
 						break;
 				}
 			} while (true);
 		}
 
-		private static void Error(string text)
+		private static void CurrentTask(List<TaskModel> tasks)
 		{
-			Console.Clear();
-			Console.ForegroundColor = ConsoleColor.Red;
-			Console.WriteLine(text);
-			Console.ResetColor();
-			Console.WriteLine();
-		}
+			string fDay = "All day";
+			TaskModel currentTask = tasks.Where(x => x.StartDate > DateTime.Now).OrderBy(x => x.StartDate).FirstOrDefault();
 
-		private static bool IsCorrect()
-		{
-			if (path == "")
+			if (currentTask == null)
 			{
-				Error("Wrong file name!");
+				Console.WriteLine("no upcoming events");
 				return;
 			}
 
-			if (path.Contains(".txt") == false)
+			if (currentTask.FinishDate != null)
 			{
-				if (path == ".txt")
-				{
-					Error("Wrong file name!");
-					return;
-				}
-				Error("Wrong extension!");
-				return;
+				fDay = currentTask.FinishDate.GetValueOrDefault().ToString("d");
 			}
+
+			Dictionary<string, int> current = new Dictionary<string, int>
+			{
+				["Current task: "] = 15,
+				[""] = 10,
+				["Start day: "] = 15,
+				[currentTask.StartDate.GetValueOrDefault().ToString("d")] = 10,
+				["Finish day: "] = 15,
+				[fDay] = 10,
+				["Description: "] = 15,
+				[currentTask.Description] = 10,
+				["Important: "] = 15,
+				[currentTask.Important.ToString()] = 10,
+			};
+
+			Console.WriteLine("".PadLeft(25, '.'));
+			ConsoleWriter.WriteHead(current, Position.Mix);
+			Console.WriteLine("".PadLeft(25, '.'));
 		}
 
 		private static void SaveTasks(List<TaskModel> tasks)
 		{
-			Console.Clear();
-			Console.Write("Set name/path file to save (e.g. Tasks.txt): ");
+			ConsoleWriter.WriteEx("Set name/path file to save (e.g. List.txt): ");
+
 			string path = Console.ReadLine();
-			if (path == "")
-			{
-				Error("Wrong file name!");
-				return;
-			}
+			if (!Check.IsCorrectPath(path)) return;
 
 			if (File.Exists(path) != true)
 			{
 				using (StreamWriter s = File.CreateText(path))
 				{
 					string[] taskString;
+					string fDay = "";
 					foreach (TaskModel task in tasks)
 					{
-						taskString = new string[] { task.Description, task.StartDate, task.FinishDate, task.AllDay.ToString(), task.Important.ToString() };
+						if (task.FinishDate != null)
+						{
+							fDay = ((DateTime)task.FinishDate).ToString("d");
+						}
+
+						taskString = new string[] { task.Description, ((DateTime)task.StartDate).ToString("d"), fDay, task.AllDay.ToString(), task.Important.ToString() };
 
 						s.WriteLine(string.Join(",", taskString));
 					}
 				}
-				Console.Clear();
-				Console.ForegroundColor = ConsoleColor.Green;
-				Console.WriteLine($"File was saved");
-				Console.WriteLine();
-				Console.ResetColor();
+
+				ConsoleWriter.ConsoleColor("File was saved", ConsoleColor.Green);
 			}
 			else
 			{
-				Error("File exist!");
+				ConsoleWriter.ConsoleColor("File exist!", ConsoleColor.Red);
+				return;
 			}
 		}
 
 		private static void LoadTasks(List<TaskModel> tasks)
 		{
-			Console.Clear();
-			Console.Write("Set name/path file (List.txt): ");
+			ConsoleWriter.WriteEx("Set name/path file (List.txt): ");
 			string path = Console.ReadLine();
 
-
-
-			if(path == "")
-			{
-				Error("Wrong file name!");
-				return;
-			}
-
-			if(path.Contains(".txt") == false)
-			{
-				if(path == ".txt")
-				{
-					Error("Wrong file name!");
-					return;
-				}
-				Error("Wrong extension!");
-				return;
-			}
+			if (!Check.IsCorrectPath(path)) return;
 
 			string[] text = File.ReadAllLines(path);
+			DateTime? finishDate;
+			DateTime fDate;
 
 			foreach (string task in text)
 			{
-				string[] parts = task.Split(',');
-				tasks.Add(new TaskModel(parts[0], parts[1], bool.Parse(parts[3]),
-										bool.Parse(parts[4]), parts[2]));
+				string[] parts = new string[] { };
+
+				if (task.Contains(','))
+				{
+					parts = task.Split(',');
+				}
+
+				if (task.Contains(';'))
+				{
+					parts = task.Split(';');
+				}
+				if (!DateTime.TryParse(parts[2], out fDate))
+				{
+					finishDate = null;
+				}
+				else
+				{
+					finishDate = fDate;
+				}
+
+				tasks.Add(new TaskModel(parts[0], DateTime.Parse(parts[1]), bool.Parse(parts[3]),
+										bool.Parse(parts[4]), finishDate));
 			}
 
-			Console.Clear();
-			Console.ForegroundColor = ConsoleColor.Green;
-			Console.WriteLine($"File was loaded");
-			Console.WriteLine();
-			Console.ResetColor();
+			ConsoleWriter.ConsoleColor("File was loaded", ConsoleColor.Green);
 			ShowTask(tasks);
 		}
 
@@ -166,6 +186,7 @@ namespace ToDoList
 			int i = 0;
 			Console.Clear();
 			ShowTask(tasks);
+
 			Console.Write("Chose number task to delete : ");
 			string decision = Console.ReadLine().Trim();
 			bool result = int.TryParse(decision, out i);
@@ -173,122 +194,59 @@ namespace ToDoList
 			if (result == true && i <= tasks.Count)
 			{
 				tasks.RemoveAt(i - 1);
-				Console.Clear();
-				Console.Clear();
-				Console.ForegroundColor = ConsoleColor.Green;
-				Console.WriteLine($"Task was removed");
-				Console.WriteLine();
-				Console.ResetColor();
+				ConsoleWriter.ConsoleColor("Task was removed", ConsoleColor.Green);
 				ShowTask(tasks);
 			}
 			else
 			{
-				Console.Clear();
-				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine("Wrong Number");
-				Console.ResetColor();
-				Console.WriteLine();
-
+				ConsoleWriter.ConsoleColor("Wrong Index", ConsoleColor.Red);
+				return;
 			}
 		}
 
-		private static void ShowTask(List<TaskModel> tasks)
+		internal static void ShowTask(List<TaskModel> tasks)
 		{
-			int i = 1;
-
+			string fDay = "";
 			Console.WriteLine("Task |".PadLeft(10) + "Description |".PadLeft(20) + "Start day |".PadLeft(15) + "All day |".PadLeft(10) + "Finish day |".PadLeft(15) + "Important |".PadLeft(11));
 			Console.WriteLine("".PadLeft(100, '.'));
 
-			foreach (TaskModel task in tasks)
+			for (int i = 0; i <= tasks.Count - 1; i++)
 			{
-				Console.WriteLine($"{i} |".PadLeft(10) + $"{task.Description} |".PadLeft(20) + $"{task.StartDate} |".PadLeft(15) +
-								  $"{task.AllDay} |".PadLeft(10) + $"{task.FinishDate} |".PadLeft(15) + $"{task.Important} |".PadLeft(11));
-				i++;
+
+				if (tasks[i].FinishDate != null)
+				{
+					fDay = tasks[i].FinishDate.GetValueOrDefault().ToString("d");
+				}
+
+				Console.WriteLine($"{i + 1} |".PadLeft(10) +
+				$"{tasks[i].Description} |".PadLeft(20) +
+				$"{tasks[i].StartDate.GetValueOrDefault().ToString("d")} |".PadLeft(15) +
+				$"{tasks[i].AllDay} |".PadLeft(10) +
+				$"{fDay} |".PadLeft(15) +
+				$"{tasks[i].Important} |".PadLeft(11));
+
+				fDay = "";
 			}
 			Console.WriteLine();
 		}
 
 		private static void AddTask(List<TaskModel> tasks)
 		{
-			bool allDay = true;
-			bool important = false;
-			string finishDate = "";
+			Console.Clear();
+			DateTime? finishDate = null;
+			if (!Check.GetCorrectDescription(out string description)) return;
+			if (!Check.GetCorrectDate("Start day (yyyy-mm-dd): ", out DateTime? startDate)) return;
+			if (!Check.DecisionInSwitch("All day task? y/n : ", out bool allDay)) return;
+
+			if (allDay == false)
+				if (!Check.GetCorrectDate("Finish day (yyyy-mm-dd) : ", out finishDate)) return;
+
+			if (!Check.DecisionInSwitch("Important? y/n : ", out bool important)) return;
+
+			tasks.Add(new TaskModel(description, startDate, allDay, important, finishDate));
 
 			Console.Clear();
-			Console.Write("Description : ");
-			string description = Console.ReadLine();
-			if (description == "")
-			{
-				Console.Clear();
-				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine("Niepoprawne dane");
-				Console.ResetColor();
-				Console.WriteLine();
-				return;
-			}
-
-			Console.Clear();
-			Console.Write("Start day : ");
-			string startDate = Console.ReadLine();
-			if (startDate == "")
-			{
-				Console.Clear();
-				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine("Niepoprawne dane");
-				Console.ResetColor();
-				Console.WriteLine();
-				return;
-			}
-
-			Console.Clear();
-			Console.Write("All day task? y/n : ");
-			string decision = Console.ReadLine();
-			bool b = true;
-			if (decision == "n")
-			{
-				
-				allDay = false;
-				Console.Clear();
-				Console.Write("Finish day : ");
-				finishDate = Console.ReadLine();
-				if (description == "")
-				{
-					Console.Clear();
-					Console.ForegroundColor = ConsoleColor.Red;
-					Console.WriteLine("Niepoprawne dane");
-					Console.ResetColor();
-					Console.WriteLine();
-					b = false;
-				}
-				
-			}
-			if (b == false)
-			{
-				return;
-			}
-
-			Console.Clear();
-			Console.Write("Important? y/n : ");
-			decision = Console.ReadLine();
-			if (decision == "y")
-			{
-				important = true;
-			}
-			Console.Clear();
-
-			if (allDay == true)
-			{
-				tasks.Add(new TaskModel(description, startDate, allDay, important));
-			}
-			else
-			{
-				tasks.Add(new TaskModel(description, startDate, allDay, important, finishDate));
-			}
-			Console.Clear();
-			Console.ForegroundColor = ConsoleColor.Green;
-			Console.WriteLine($"Task was added");
-			Console.WriteLine();
-			Console.ResetColor();
+			ConsoleWriter.ConsoleColor("Task was added", ConsoleColor.Green);
 			ShowTask(tasks);
 		}
 	}
